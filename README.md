@@ -11,5 +11,8 @@ The system must let the user decide the time base and then visualize, for each l
 
 For instance: if the ADC time is `40 uS`, setting a time base of `60 uS/div`, each shown value will be the progressive average of three samples `((a0 + a1) / 2 + a2) / 2`
 
+## ⚠️ Important note ⚠️
+The entire project must be realized without the use of any library aside of the basic AVR for symbol reference
+
 ## Electrical scheme (Fritzing)
 ![Fritzing scheme](relazione/img/progettoFritzing.PNG "Electrical scheme")
