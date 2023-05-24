@@ -1,0 +1,386 @@
+<?xml version="1.0"?>
+<flowgorithm fileversion="3.0">
+    <attributes>
+        <attribute name="name" value=""/>
+        <attribute name="authors" value="anton"/>
+        <attribute name="about" value=""/>
+        <attribute name="saved" value="2023-05-24 06:49:56 "/>
+        <attribute name="created" value="YW50b247TUFHSUNBTERFU0tUT1A7MjAyMy0wNS0yNDsiMTI6MjA6MjYgIjsyNzYy"/>
+        <attribute name="edited" value="YW50b247TUFHSUNBTERFU0tUT1A7MjAyMy0wNS0yNDsiMDY6NDk6NTYgIjs0OzI4OTA="/>
+    </attributes>
+    <function name="Main" type="None" variable="">
+        <parameters/>
+        <body>
+            <comment text="Dichiarazione variabili globali"/>
+            <declare name="currentReadings" type="Integer" array="False" size=""/>
+            <declare name="maxReadings" type="Integer" array="False" size=""/>
+            <declare name="currentCol" type="Integer" array="False" size=""/>
+            <declare name="readData" type="Integer" array="False" size=""/>
+            <declare name="timeBase" type="Integer" array="False" size=""/>
+            <declare name="isRecording" type="Boolean" array="False" size=""/>
+            <declare name="spistatus" type="Integer" array="True" size="64"/>
+            <declare name="lockStartBtn" type="Integer" array="False" size=""/>
+            <call expression="setup"/>
+            <while expression="true">
+                <comment text="Quando si verifica un interrupt, la funzione loop viene interrotta e il flusso di esecuzione passa al codice di gestione dello specifico interrupt"/>
+                <call expression="loop"/>
+            </while>
+        </body>
+    </function>
+    <function name="byteToLeds" type="Integer" variable="val">
+        <parameters>
+            <parameter name="data" type="Integer" array="False"/>
+        </parameters>
+        <body>
+            <declare name="val" type="Integer" array="False" size=""/>
+            <assign variable="val" expression="0"/>
+            <declare name="max" type="Integer" array="False" size=""/>
+            <comment text="Dividiamo data in un range da 0 a 9, per decidere quali led accendere (0 nessuno, 9 tutti e 8)"/>
+            <assign variable="max" expression="data / 28"/>
+            <for variable="i" start="0" end="max - 1" direction="inc" step="1">
+                <assign variable="val" expression="val | 1"/>
+                <if expression="i != max - 1">
+                    <then>
+                        <assign variable="val" expression="val &lt;&lt; 1"/>
+                    </then>
+                    <else/>
+                </if>
+            </for>
+        </body>
+    </function>
+    <function name="cbi" type="None" variable="">
+        <parameters>
+            <parameter name="reg" type="Integer" array="False"/>
+            <parameter name="bit" type="Integer" array="False"/>
+        </parameters>
+        <body>
+            <comment text="Questa funzione verr&#224; rappresentata come macro nel codice"/>
+            <assign variable="reg" expression="reg | (1 &lt;&lt; bit)"/>
+        </body>
+    </function>
+    <function name="flipByte" type="Integer" variable="r">
+        <parameters>
+            <parameter name="c" type="Integer" array="False"/>
+        </parameters>
+        <body>
+            <declare name="r" type="Integer" array="False" size=""/>
+            <assign variable="r" expression="0"/>
+            <for variable="i" start="0" end="7" direction="inc" step="1">
+                <assign variable="r" expression="r &lt;&lt; 1"/>
+                <assign variable="r" expression="r | (c &amp; 1)"/>
+                <assign variable="c" expression="c &gt;&gt; 1"/>
+            </for>
+        </body>
+    </function>
+    <function name="InterruptADC" type="None" variable="">
+        <parameters/>
+        <body>
+            <comment text="Prendo il valore dei registri del risultato dell'ADC, ADCL per primo. Shifto il tutto di due bit per convertire il risultato da 10 bit a 8 bit, ignorando quelli meno significativi"/>
+            <assign variable="readData" expression="(readData + (ADCL | (ADCH &lt;&lt; 8)) &gt;&gt; 2) / 2"/>
+            <comment text="Incremento l'indice"/>
+            <assign variable="currentReadings" expression="currentReadings + 1"/>
+        </body>
+    </function>
+    <function name="ledClear" type="None" variable="">
+        <parameters/>
+        <body>
+            <comment text="Pulisco tutte le colonne"/>
+            <for variable="i" start="0" end="7" direction="inc" step="1">
+                <assign variable="spistatus[i]" expression="0"/>
+                <call expression="spiSend(i + 1, spistatus[i])"/>
+            </for>
+        </body>
+    </function>
+    <function name="ledInit" type="None" variable="">
+        <parameters/>
+        <body>
+            <comment text="Utilizzo dei pin:&#13;&#10;6: MOSI/DATAIN (Trasferimento dati)&#13;&#10;5: CS (Chip Select)&#13;&#10;4: CLK (Clock del controller SPI)"/>
+            <comment text="Imposto i pin MOSI, CS e CLK come output"/>
+            <call expression="sbi(DDRD, DDD6)"/>
+            <call expression="sbi(DDRD, DDD5)"/>
+            <call expression="sbi(DDRD, DDD4)"/>
+            <comment text="Attivo il pin Chip Select"/>
+            <call expression="sbi(PORTD, DDD5)"/>
+            <comment text="Inizializzo la matrice&#13;&#10;15: Display Test&#13;&#10;11: Scan Limit&#13;&#10;9: Decode Mode"/>
+            <call expression="spiSend(15, 0)"/>
+            <call expression="spiSend(11, 7)"/>
+            <call expression="spiSend(9, 0)"/>
+            <call expression="ledClear()"/>
+            <call expression="ledShutdown(true)"/>
+            <call expression="ledShutdown(false)"/>
+        </body>
+    </function>
+    <function name="ledSet" type="None" variable="">
+        <parameters>
+            <parameter name="row" type="Integer" array="False"/>
+            <parameter name="col" type="Integer" array="False"/>
+            <parameter name="state" type="Boolean" array="False"/>
+        </parameters>
+        <body>
+            <declare name="val" type="Integer" array="False" size=""/>
+            <assign variable="val" expression="1 &lt;&lt; (7 - col)"/>
+            <if expression="state">
+                <then>
+                    <assign variable="spistatus[row]" expression="spistatus[row] | val"/>
+                </then>
+                <else>
+                    <assign variable="spistatus[row]" expression="spistatus[row] &amp; ~val"/>
+                </else>
+            </if>
+            <call expression="spiSend(row + 1, spistatus[row])"/>
+        </body>
+    </function>
+    <function name="ledSetCol" type="None" variable="">
+        <parameters>
+            <parameter name="col" type="Integer" array="False"/>
+            <parameter name="value" type="Integer" array="False"/>
+        </parameters>
+        <body>
+            <comment text="Giro il byte per illuminare la matrice partendo dal basso"/>
+            <assign variable="spistatus[col]" expression="flipByte(value)"/>
+            <comment text="Invio il comando per illuminare la colonna"/>
+            <call expression="spiSend(col + 1, spistatus[col])"/>
+        </body>
+    </function>
+    <function name="ledSetRow" type="None" variable="">
+        <parameters>
+            <parameter name="row" type="Integer" array="False"/>
+            <parameter name="value" type="Integer" array="False"/>
+        </parameters>
+        <body>
+            <for variable="col" start="0" end="7" direction="inc" step="1">
+                <declare name="val" type="Integer" array="False" size=""/>
+                <assign variable="val" expression="value &gt;&gt; col"/>
+                <assign variable="val" expression="val &amp; 0x01"/>
+                <comment text="Invio il comando per illuminare la riga bit-per-bit"/>
+                <call expression="ledSet(col, row, val)"/>
+            </for>
+        </body>
+    </function>
+    <function name="ledShutdown" type="None" variable="">
+        <parameters>
+            <parameter name="shutdown" type="Boolean" array="False"/>
+        </parameters>
+        <body>
+            <comment text="Invio il comando di shutdown alla matrice, la variabile &quot;shutdown&quot; serve a decidere se la matrice si deve spegnere (true) o accendere (false)"/>
+            <call expression="spiSend(12, shutdown ? 0 : 1)"/>
+        </body>
+    </function>
+    <function name="loop" type="None" variable="">
+        <parameters/>
+        <body>
+            <comment text="Variabile d'appoggio: true se il pulsante viene premuto in quell'istante&#13;&#10;"/>
+            <declare name="startBtnDown" type="Boolean" array="False" size=""/>
+            <assign variable="startBtnDown" expression="PIND &amp; _BV(DDD7)"/>
+            <comment text="Avvio / Interrompo la registrazione alla pressione del pulsante"/>
+            <if expression="startBtnDown &amp;&amp; !lockStartBtn">
+                <then>
+                    <assign variable="lockStartBtn" expression="true"/>
+                    <if expression="isRecording">
+                        <then>
+                            <call expression="stopRecording()"/>
+                        </then>
+                        <else>
+                            <call expression="startRecording()"/>
+                        </else>
+                    </if>
+                </then>
+                <else>
+                    <if expression="!startBtnDown">
+                        <then>
+                            <assign variable="lockStartBtn" expression="false"/>
+                        </then>
+                        <else/>
+                    </if>
+                </else>
+            </if>
+            <comment text="Imposto dataIndex a 0 in modo da ciclare l'array una volta riempito tutto"/>
+            <if expression="isRecording">
+                <then>
+                    <if expression="currentReadings &gt;= maxReadings">
+                        <then>
+                            <assign variable="currentReadings" expression="0"/>
+                            <call expression="ledSetCol(currentCol, byteToLeds(readData))"/>
+                            <assign variable="currentCol" expression="(currentCol + 1) % 8"/>
+                        </then>
+                        <else/>
+                    </if>
+                </then>
+                <else>
+                    <assign variable="timeBase" expression="readAnalogByte(A5)"/>
+                    <call expression="ledSetRows({3, 4}, byteToLeds(timeBase))"/>
+                </else>
+            </if>
+        </body>
+    </function>
+    <function name="progrAvg" type="Integer" variable="sum">
+        <parameters>
+            <parameter name="data" type="Integer" array="True"/>
+            <parameter name="start" type="Integer" array="False"/>
+            <parameter name="length" type="Integer" array="False"/>
+        </parameters>
+        <body>
+            <declare name="sum" type="Integer" array="False" size=""/>
+            <while expression="start &lt;= len">
+                <assign variable="sum" expression="(sum + data[start]) / 2"/>
+                <assign variable="start" expression="start +1"/>
+            </while>
+        </body>
+    </function>
+    <function name="readAnalog" type="Integer" variable="val">
+        <parameters>
+            <parameter name="analogPin" type="Integer" array="False"/>
+        </parameters>
+        <body>
+            <declare name="val" type="Integer" array="False" size=""/>
+            <if expression="analogPin &gt;= 14">
+                <then>
+                    <assign variable="analogPin" expression="analogPin - 14"/>
+                    <comment text="Inizializzo la conversione ADC"/>
+                    <assign variable="ADMUX" expression="DEFAULT &lt;&lt; 6"/>
+                    <comment text="Imposto il pin analogico da usare"/>
+                    <assign variable="ADMUX" expression="ADMUX | analogPin"/>
+                    <comment text="Abilito la conversione AD"/>
+                    <call expression="sbi(ADCSRA, ADSC)"/>
+                    <comment text="Aspetto che termini la conversione AD"/>
+                    <while expression="ADCSRA &amp; (1 &lt;&lt; ADSC)"/>
+                    <comment text="Assegno a &quot;val&quot; il valore letto dall'ADC"/>
+                    <assign variable="val" expression="ADCL | (ADCH &lt;&lt; 8)"/>
+                </then>
+                <else/>
+            </if>
+        </body>
+    </function>
+    <function name="readAnalogByte" type="Integer" variable="val">
+        <parameters>
+            <parameter name="analogPin" type="Integer" array="False"/>
+        </parameters>
+        <body>
+            <declare name="val" type="Integer" array="False" size=""/>
+            <assign variable="val" expression="readAnalog(analogPin) &gt;&gt; 2"/>
+        </body>
+    </function>
+    <function name="sbi" type="None" variable="">
+        <parameters>
+            <parameter name="reg" type="Integer" array="False"/>
+            <parameter name="bit" type="Integer" array="False"/>
+        </parameters>
+        <body>
+            <assign variable="reg" expression="reg &amp; ~(1 &lt;&lt; bit)"/>
+        </body>
+    </function>
+    <function name="setup" type="None" variable="">
+        <parameters/>
+        <body>
+            <comment text="Imposto tutti i pin da 0 a 7 in OUTPUT"/>
+            <assign variable="DDRD" expression="0xFF"/>
+            <comment text="Inizializzo le variabili"/>
+            <assign variable="isRecording" expression="false"/>
+            <assign variable="lockStartBtn" expression="false"/>
+            <assign variable="timeBase" expression="0"/>
+            <comment text="Imposto il pin 7 come input"/>
+            <call expression="cbi(DDRD, DDD7)"/>
+            <comment text="Inizializzo la matrice led"/>
+            <call expression="ledInit()"/>
+        </body>
+    </function>
+    <function name="spiSend" type="None" variable="">
+        <parameters>
+            <parameter name="opCode" type="Integer" array="False"/>
+            <parameter name="data" type="Integer" array="False"/>
+        </parameters>
+        <body>
+            <comment text="Inserisco i dati nell'array da mandare al controller SPI"/>
+            <declare name="spidata" type="Integer" array="True" size="2"/>
+            <assign variable="spidata" expression="{opcode, data}"/>
+            <comment text="Imposto il Chip Select (pin 5) a LOW, abilitando in questo modo la comunicazione con il controller SPI"/>
+            <call expression="cbi(PORTD, DDD5)"/>
+            <comment text="Invio il comando al controller SPI tramite la funzione spiShiftOut"/>
+            <for variable="i" start="0" end="1" direction="inc" step="1">
+                <call expression="spiShiftOut(spidata[i])"/>
+            </for>
+            <comment text="Riattivo il Chip Select (pin 5) per riabilitare la matrice, con le nuove istruzioni"/>
+            <call expression="sbi(PORTD, DDD5)"/>
+        </body>
+    </function>
+    <function name="spiShiftOut" type="None" variable="">
+        <parameters>
+            <parameter name="val" type="Integer" array="False"/>
+        </parameters>
+        <body>
+            <comment text="Uso il pin 6 come pin di trasmissione dati e il pin 4 come pin di clock SPI"/>
+            <for variable="i" start="0" end="7" direction="inc" step="1">
+                <if expression="val &amp; (1 &lt;&lt; (7 - i))">
+                    <then>
+                        <comment text="Imposto il pin a HIGH"/>
+                        <call expression="sbi(PORTD, DDD6)"/>
+                    </then>
+                    <else>
+                        <comment text="Imposto il pin a LOW"/>
+                        <call expression="cbi(PORTD, DDD6)"/>
+                    </else>
+                </if>
+                <comment text="Imposto il pin di clock prima a 1 poi a 0, per eseguire un tick"/>
+                <call expression="sbi(PORTD, DDD4)"/>
+                <call expression="cbi(PORTD, DDD4)"/>
+            </for>
+        </body>
+    </function>
+    <function name="startRecording" type="None" variable="">
+        <parameters/>
+        <body>
+            <assign variable="isRecording" expression="true"/>
+            <comment text="Pulisco la matrice LED"/>
+            <call expression="ledClear()"/>
+            <comment text="Accendo il led"/>
+            <call expression="sbi(PORTD, DDD2)"/>
+            <comment text="Disabilito gli interrupt, per assicurare l'esecuzione atomica del codice sottostante"/>
+            <call expression="cli()"/>
+            <comment text="Cancello ADLAR (bit numero 5) per allineare a destra il risultato della conversione"/>
+            <call expression="cbi(ADMUX, ADLAR)"/>
+            <comment text="Imposto la sorgente 5V per ADMUX (01)"/>
+            <call expression="sbi(ADMUX, REFS0)"/>
+            <comment text="Cancello i 4 bit inferiori del registro ADMUX, ovvero quelli dedicati al pin analogico selezionato"/>
+            <assign variable="ADMUX" expression="ADMUX &#30;&amp; 0xF"/>
+            <comment text="Imposto il pin 4 (analog4) come pin input per la conversione ADC"/>
+            <assign variable="ADMUX" expression="ADMUX | 4"/>
+            <comment text="Imposto ADEN (bit 7) per abilitare l'ADC"/>
+            <call expression="sbi(ADCSRA, ADEN)"/>
+            <comment text="Imposto ADATE (bit 5) per abilitare l'auto triggering"/>
+            <call expression="sbi(ADCSRA, ADATE)"/>
+            <comment text="Cancello i tre bit della modalit&#224; di trigger, impostandola in questo modo a &quot;free running&quot;. Al termine di ogni conversione ADC ne inizier&#224; una nuova"/>
+            <call expression="cbi(ADCSRB, ADTS2)"/>
+            <call expression="cbi(ADCSRB, ADTS1)"/>
+            <call expression="cbi(ADCSRB, ADTS0)"/>
+            <comment text="Imposto il prescaler a 128 (16MHz/128 = 125KHz)&#13;&#10;Sopra i 200KHz i risultati dell'ADC non sono affidabili"/>
+            <call expression="sbi(ADCSRA, CS10)"/>
+            <call expression="sbi(ADCSRA, CS11)"/>
+            <call expression="sbi(ADCSRA, CS12)"/>
+            <comment text="Imposto ADIE per abilitare l'interrupt alla fine della conversione ADC"/>
+            <call expression="sbi(ADCSRA, ADIE)"/>
+            <comment text="Ri-abilito gli interrupt.&#13;&#10;D'ora in poi l'esecuzione del codice non &#232; pi&#249; atomica"/>
+            <call expression="sei()"/>
+            <comment text="Imposto ADSC per iniziare la conversione ADC.&#13;&#10;La prima volta &#232; necessario, poi fa da solo grazie all'auto-triggering"/>
+            <call expression="sbi(ADCSRA, ADSC)"/>
+        </body>
+    </function>
+    <function name="stopRecording" type="None" variable="">
+        <parameters/>
+        <body>
+            <comment text="Spengo il led"/>
+            <call expression="cbi(PORTD, DDD2)"/>
+            <comment text="Cancello ADSC (bit numero 6) per fermare l'eventuale conversione in corso (e anche quella dopo, interrompendo cos&#236; il ciclo)"/>
+            <call expression="cbi(ADCSRA, ADSC)"/>
+            <comment text="Cancello ADATE (bit numero 5) per disabilitare l'auto-triggering"/>
+            <call expression="cbi(ADCSRA, ADATE)"/>
+            <comment text="Cancello ADIE (bit numero 3) per disabilitare l'interrupt ADC"/>
+            <call expression="cbi(ADCSRA, ADIE)"/>
+            <comment text="Pulisco la matrice LED"/>
+            <call expression="ledClear()"/>
+            <comment text="Azzero l'indice dell'array"/>
+            <assign variable="dataIndex" expression="0"/>
+            <comment text="Imposto la variabile di stato"/>
+            <assign variable="isRecording" expression="false"/>
+        </body>
+    </function>
+</flowgorithm>

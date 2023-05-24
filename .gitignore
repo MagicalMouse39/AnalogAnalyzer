@@ -1,0 +1,11 @@
+build/
+
+*.zip
+*.fls
+*.aux
+*.fdb_latexmk
+*.log
+*.nav
+*.snm
+*.gz
+*.out

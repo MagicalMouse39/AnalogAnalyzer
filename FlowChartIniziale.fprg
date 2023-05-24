@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+<flowgorithm fileversion="3.0">
+    <attributes>
+        <attribute name="name" value=""/>
+        <attribute name="authors" value="anton"/>
+        <attribute name="about" value=""/>
+        <attribute name="saved" value="2023-05-24 07:44:33 "/>
+        <attribute name="created" value="YW50b247TUFHSUNBTERFU0tUT1A7MjAyMy0wNS0yNDsiMDc6MzI6MzIgIjsyNzY2"/>
+        <attribute name="edited" value="YW50b247TUFHSUNBTERFU0tUT1A7MjAyMy0wNS0yNDsiMDc6NDQ6MzMgIjsyOzI4Nzk="/>
+    </attributes>
+    <function name="Main" type="None" variable="">
+        <parameters/>
+        <body>
+            <declare name="val" type="Integer" array="False" size=""/>
+            <assign variable="val" expression="0"/>
+            <declare name="timeBase" type="Integer" array="False" size=""/>
+            <declare name="recording" type="Boolean" array="False" size=""/>
+            <input variable="letture"/>
+            <while expression="true">
+                <if expression="recording">
+                    <then>
+                        <for variable="i" start="0" end="letture - 1" direction="inc" step="1">
+                            <assign variable="val" expression="(val + adc_res) / 2"/>
+                        </for>
+                        <output expression="matrice[col] = byteToLeds(val)" newline="True"/>
+                    </then>
+                    <else>
+                        <assign variable="timeBase" expression="readAnalog(A5)"/>
+                        <output expression="matrice righe 3, 4 = byteToLeds(timeBase)" newline="True"/>
+                    </else>
+                </if>
+            </while>
+        </body>
+    </function>
+</flowgorithm>
