@@ -22,7 +22,7 @@ lookup_table = {
     'reti': 4
 }
 
-proc = subprocess.Popen("avr-objdump -M intel -D build/arduino.avr.uno/SgallaProgetto.ino.elf | awk -v RS= '/^[[:xdigit:]]+ <__vector_21>/'", shell=True, stdout=subprocess.PIPE)
+proc = subprocess.Popen("avr-objdump -M intel -D build/arduino.avr.uno/Progetto.ino.elf | awk -v RS= '/^[[:xdigit:]]+ <__vector_21>/'", shell=True, stdout=subprocess.PIPE)
 func = proc.stdout.read().decode()
 
 print(func)
