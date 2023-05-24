@@ -1,7 +1,7 @@
 # AnalogAnalyzer
 Project for university by `Magical`
 
-This entire project is in italian, because that's my professors main language (and also mine).
+This entire project is in italian, because that's my professors' main language (and also mine).
 I'll translate the project description for all of you non-italian speakers:
 
 ## Project description
